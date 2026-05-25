@@ -1,0 +1,122 @@
+# Azure Subscription and Basic Configuration
+azure_subscription_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+environment           = "dev" # Change to "staging" or "prod" as needed
+location              = "East US"
+location_short        = "eus"
+company_name          = "mycompany"
+project_name          = "enterprise"
+
+# Common Tags
+tags = {
+  ManagedBy      = "Terraform"
+  Source         = "terraform-azure"
+  CostCenter     = "Engineering"
+  DataClassification = "Internal"
+  Owner          = "DevOps Team"
+}
+
+# =====================================================================
+# NETWORKING CONFIGURATION
+# =====================================================================
+
+# Virtual Network Address Space (CIDR)
+vnet_address_space = ["10.0.0.0/16"]
+
+# Subnet Configuration
+# Each subnet must have a unique address prefix within the VNet
+subnet_config = {
+  "aks-subnet" = {
+    address_prefixes = ["10.0.1.0/24"]  # For AKS nodes (supports 251 IPs)
+  }
+  "app-gateway-subnet" = {
+    address_prefixes = ["10.0.2.0/24"]  # For Application Gateway
+  }
+  "private-endpoint-subnet" = {
+    address_prefixes = ["10.0.3.0/24"]  # For private endpoints (databases, storage)
+  }
+}
+
+# =====================================================================
+# KUBERNETES (AKS) CONFIGURATION
+# =====================================================================
+
+# Kubernetes Version (check available versions with: az aks get-versions --location)
+kubernetes_version = "1.29"
+
+# Node Pool Configuration
+node_pool_config = {
+  initial_count       = 3              # Initial number of nodes
+  min_count          = 3              # Minimum for autoscaling
+  max_count          = 10             # Maximum for autoscaling
+  vm_size            = "Standard_D2s_v3"  # VM SKU
+  enable_auto_scaling = true
+
+  node_labels = {
+    environment = "prod"
+    workload    = "general"
+    version     = "v1"
+  }
+
+  # Optional: Node taints for workload isolation
+  # node_taints = [
+  #   {
+  #     key    = "workload"
+  #     value  = "gpu"
+  #     effect = "NoSchedule"
+  #   }
+  # ]
+}
+
+# Security and Networking for AKS
+enable_pod_identity   = true           # Enable Azure AD pod identity for workload authentication
+enable_network_policy = true           # Enable network policies for pod-to-pod communication
+network_policy        = "azure"        # Use "azure" or "calico"
+
+# =====================================================================
+# DATABASE CONFIGURATION
+# =====================================================================
+
+# PostgreSQL Database
+enable_postgresql     = true           # Set to false to skip PostgreSQL
+postgresql_version    = "15"           # Supported versions: 11, 12, 13, 14, 15
+postgresql_sku_name   = "B_Standard_B1ms"  # SKU: B_Standard_B1ms, B_Standard_B2s, etc.
+postgresql_storage_mb = 32768          # 32GB storage
+
+# MySQL Database
+enable_mysql          = false          # Set to true to enable MySQL
+mysql_version         = "8.0.37"       # MySQL version
+
+# =====================================================================
+# STORAGE CONFIGURATION
+# =====================================================================
+
+enable_storage_account = true
+storage_account_tier   = "Standard"    # "Standard" or "Premium"
+
+# =====================================================================
+# MONITORING & OBSERVABILITY
+# =====================================================================
+
+enable_monitoring               = true
+log_analytics_retention_days    = 30  # 7-730 days
+
+# =====================================================================
+# SECURITY CONFIGURATION
+# =====================================================================
+
+enable_key_vault      = true
+key_vault_sku_name    = "standard"    # "standard" or "premium"
+
+# =====================================================================
+# LOAD BALANCING
+# =====================================================================
+
+enable_app_gateway    = true
+app_gateway_sku       = "Standard_v2"
+
+# =====================================================================
+# COST OPTIMIZATION
+# =====================================================================
+
+auto_shutdown_enabled  = false         # Auto-shutdown for dev environments
+resource_locks_enabled = true          # Prevent accidental deletion in production
