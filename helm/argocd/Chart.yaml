@@ -1,0 +1,21 @@
+apiVersion: v2
+name: argocd
+description: ArgoCD GitOps deployment Helm chart
+type: application
+version: 1.0.0
+appVersion: "2.8.0"
+keywords:
+  - argocd
+  - gitops
+  - kubernetes
+  - deployment
+maintainers:
+  - name: DevOps Team
+    email: devops@company.com
+home: https://github.com/manmohanreddy/Terraform-Azure
+sources:
+  - https://github.com/manmohanreddy/Terraform-Azure
+dependencies:
+  - name: argo-cd
+    version: "5.27.0"
+    repository: "https://argoproj.github.io/argo-helm"

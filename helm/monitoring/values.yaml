@@ -1,0 +1,195 @@
+# Monitoring Stack - Prometheus + Grafana
+
+kubePrometheusStack:
+  enabled: true
+
+  # Prometheus settings
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      retention: 15d
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+
+  # Grafana settings
+  grafana:
+    enabled: true
+    adminPassword: "admin123!"  # Change in production
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClassName: default
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus:9090
+          access: proxy
+          isDefault: true
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+    dashboards:
+      default:
+        kubernetes-cluster:
+          gnetId: 7249
+          revision: 1
+          datasource: Prometheus
+        kubernetes-pods:
+          gnetId: 6417
+          revision: 1
+          datasource: Prometheus
+        node-exporter:
+          gnetId: 1860
+          revision: 23
+          datasource: Prometheus
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      hosts:
+        - grafana.example.com
+      tls:
+        - secretName: grafana-tls
+          hosts:
+            - grafana.example.com
+
+  # AlertManager settings
+  alertmanager:
+    enabled: true
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 12h
+        receiver: 'null'
+        routes:
+          - match:
+              alertname: Watchdog
+            receiver: 'null'
+          - match:
+              severity: critical
+            receiver: 'pagerduty'
+      receivers:
+      - name: 'null'
+      - name: 'pagerduty'
+        # pagerduty_configs would go here
+
+  # ServiceMonitors for prometheus-operator
+  prometheus-node-exporter:
+    enabled: true
+
+  # Kube-state-metrics
+  kubeStateMetrics:
+    enabled: true
+
+  # Prometheus Operator
+  prometheusOperator:
+    enabled: true
+    manageCrds: true
+
+# PrometheusRules for alerting
+prometheusRules:
+  enabled: true
+  rules:
+    - name: kubernetes.rules
+      interval: 30s
+      rules:
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+
+      - alert: PodNotHealthy
+        expr: min_by(namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"}) == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is not healthy"
+
+      - alert: ContainerCpuUsageHigh
+        expr: (sum(rate(container_cpu_usage_seconds_total[5m])) by (pod_name) / sum(container_spec_cpu_quota) by (pod_name) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.pod_name }} CPU usage is high"
+
+      - alert: ContainerMemoryUsageHigh
+        expr: (sum(container_memory_working_set_bytes) by (pod_name) / sum(container_spec_memory_limit_bytes) by (pod_name) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.pod_name }} memory usage is high"
+
+      - alert: KubernetesNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kubernetes Node {{ $labels.node }} is not ready"
+
+      - alert: KubernetesDiskPressure
+        expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kubernetes disk pressure detected on {{ $labels.node }}"
+
+# AlertManager Ingress
+alertmanagerIngress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - alertmanager.example.com
+  tls:
+    - secretName: alertmanager-tls
+      hosts:
+        - alertmanager.example.com
+
+# Prometheus Ingress
+prometheusIngress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: prometheus-auth
+  hosts:
+    - prometheus.example.com
+  tls:
+    - secretName: prometheus-tls
+      hosts:
+        - prometheus.example.com

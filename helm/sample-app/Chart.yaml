@@ -1,0 +1,17 @@
+apiVersion: v2
+name: sample-app
+description: Sample application Helm chart for Azure AKS
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - sample
+  - application
+  - kubernetes
+maintainers:
+  - name: DevOps Team
+    email: devops@company.com
+home: https://github.com/manmohanreddy/Terraform-Azure
+sources:
+  - https://github.com/manmohanreddy/Terraform-Azure
+dependencies: []

@@ -1,0 +1,242 @@
+# ArgoCD - GitOps Deployment
+
+argo-cd:
+  # Global settings
+  global:
+    domain: argocd.example.com
+
+  # ArgoCD Server
+  server:
+    enabled: true
+    replicas: 2
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 70
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      hosts:
+        - argocd.example.com
+      tls:
+        - secretName: argocd-tls
+          hosts:
+            - argocd.example.com
+
+    # Admin password (change in production)
+    admin:
+      enabled: true
+      password: "$2a$12$5K1f7xo0D2Z5Yk.Z1c6X4O2L8p3Q4R5S6T7U8V9W0X1Y2Z3"  # Change this!
+
+    # RBAC
+    rbac:
+      policy: "admin"
+
+  # Repo Server
+  repoServer:
+    enabled: true
+    replicas: 2
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 70
+
+    # Metrics
+    metrics:
+      enabled: true
+      service:
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8084"
+
+  # Application Controller
+  controller:
+    enabled: true
+    replicas: 2
+    metrics:
+      enabled: true
+      service:
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8085"
+
+  # ArgoCD Notifications
+  notifications:
+    enabled: true
+    notifiers:
+      service.slack: |
+        token: $slack-token
+      service.github: |
+        appID: 12345
+        installationID: 67890
+        privateKey: $github-private-key
+
+  # RBAC Configuration
+  rbac:
+    create: true
+    policyDefault: role:''
+    policy: |
+      p, role:admin, applications, *, */*, allow
+      p, role:developer, applications, get, */*, allow
+      p, role:developer, applications, sync, */*, allow
+      p, role:viewer, applications, get, */*, allow
+
+      g, admin, role:admin
+      g, developers, role:developer
+      g, viewers, role:viewer
+
+  # Secrets (for Git authentication)
+  # These should be sealed with sealed-secrets in production
+  secret:
+    createSecret: true
+    argocdServerAdminPassword: "admin123!"  # Change this!
+    github:
+      username: "github-bot"
+      token: ""  # Add your GitHub token
+    gitlab:
+      username: "gitlab-bot"
+      token: ""  # Add your GitLab token
+
+  # Resource limits
+  controller:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  repoServer:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Persistence
+  redis:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # Redis HA
+  redis-ha:
+    enabled: false  # Set to true for production HA
+
+  # Dex (for authentication)
+  dex:
+    enabled: true
+    config:
+      connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: ""  # Add your GitHub OAuth app ID
+          clientSecret: ""  # Add your GitHub OAuth secret
+          orgs:
+          - name: your-org
+            teams:
+            - DevOps
+            - Platform
+
+# ArgoCD Projects
+projects:
+  - name: default
+    namespace: argocd
+    description: Default project
+    sourceRepos:
+      - '*'
+    destinations:
+      - namespace: '*'
+        server: '*'
+    clusterResourceWhitelist:
+      - group: '*'
+        kind: '*'
+
+  - name: apps
+    namespace: argocd
+    description: Applications project
+    sourceRepos:
+      - 'https://github.com/your-org/apps'
+    destinations:
+      - namespace: 'app-*'
+        server: 'https://kubernetes.default.svc'
+      - namespace: 'production'
+        server: 'https://kubernetes.default.svc'
+    clusterResourceWhitelist:
+      - group: ''
+        kind: Namespace
+      - group: 'apps'
+        kind: Deployment
+
+# ArgoCD Applications
+applications:
+  - name: sample-app
+    namespace: argocd
+    project: apps
+    source:
+      repoURL: 'https://github.com/your-org/apps'
+      path: 'helm/sample-app'
+      targetRevision: main
+      helm:
+        releaseName: sample-app
+        values: |
+          image:
+            tag: latest
+    destination:
+      server: 'https://kubernetes.default.svc'
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m
+
+  - name: monitoring
+    namespace: argocd
+    project: apps
+    source:
+      repoURL: 'https://github.com/your-org/apps'
+      path: 'helm/monitoring'
+      targetRevision: main
+      helm:
+        releaseName: monitoring
+    destination:
+      server: 'https://kubernetes.default.svc'
+      namespace: monitoring
+    syncPolicy:
+      automated:
+        prune: false
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true

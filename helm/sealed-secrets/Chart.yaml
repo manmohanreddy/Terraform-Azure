@@ -1,0 +1,21 @@
+apiVersion: v2
+name: sealed-secrets
+description: Sealed Secrets for Kubernetes Helm chart
+type: application
+version: 1.0.0
+appVersion: "0.18.0"
+keywords:
+  - sealed-secrets
+  - secrets
+  - encryption
+  - kubernetes
+maintainers:
+  - name: DevOps Team
+    email: devops@company.com
+home: https://github.com/manmohanreddy/Terraform-Azure
+sources:
+  - https://github.com/manmohanreddy/Terraform-Azure
+dependencies:
+  - name: sealed-secrets
+    version: "2.10.0"
+    repository: "https://sealed-secrets-community.github.io/sealed-secrets"

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: monitoring
+description: Prometheus and Grafana monitoring stack Helm chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - monitoring
+  - prometheus
+  - grafana
+  - kubernetes
+maintainers:
+  - name: DevOps Team
+    email: devops@company.com
+home: https://github.com/manmohanreddy/Terraform-Azure
+sources:
+  - https://github.com/manmohanreddy/Terraform-Azure
+dependencies:
+  - name: kube-prometheus-stack
+    version: "48.0.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: kubePrometheusStack.enabled

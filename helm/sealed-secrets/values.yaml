@@ -1,0 +1,155 @@
+# Sealed Secrets - Secure Secret Management
+
+sealed-secrets:
+  # Namespace
+  namespace: kube-system
+
+  # Replica count
+  replicaCount: 2
+
+  # Image
+  image:
+    registry: ghcr.io
+    repository: sealed-secrets-community/sealed-secrets-controller
+    tag: "v0.18.0"
+    pullPolicy: IfNotPresent
+
+  # Service
+  service:
+    type: ClusterIP
+    port: 8080
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+
+  # RBAC
+  rbac:
+    create: true
+
+  # Service Account
+  serviceAccount:
+    create: true
+    name: sealed-secrets
+
+  # Key rotation
+  commandArgs:
+    - "--key-rotation-period=30d"
+    - "--key-rotation-schedule=0 0 * * 0"
+
+  # Metrics
+  metrics:
+    enabled: true
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 8080
+      labels: {}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+
+  # Logging
+  logging:
+    level: info
+
+  # Resources
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # Auto-scaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+  # Node selector (if needed)
+  nodeSelector: {}
+
+  # Tolerations
+  tolerations: []
+
+  # Affinity
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - sealed-secrets
+            topologyKey: kubernetes.io/hostname
+
+# Sealing Configuration
+sealing:
+  # Sealing scope (one of: strict, namespace, cluster)
+  # strict: Only the exact namespace and name can unseal
+  # namespace: Any resource in the same namespace can unseal
+  # cluster: Any resource in the cluster can unseal
+  scope: namespace
+
+  # Key management
+  keyRotationPeriod: 30  # days
+
+# Role-based access control
+rbac:
+  # Permissions for sealing/unsealing
+  roles:
+    - name: sealed-secrets-developer
+      rules:
+        - apiGroups:
+            - bitnami.com
+          resources:
+            - sealedsecrets
+          verbs:
+            - get
+            - list
+            - watch
+        - apiGroups:
+            - ''
+          resources:
+            - secrets
+          verbs:
+            - create
+            - list
+
+# ClusterRole for broader access
+clusterRole:
+  enabled: true
+  rules:
+    - apiGroups:
+        - bitnami.com
+      resources:
+        - sealedsecrets
+      verbs:
+        - get
+        - list
+        - watch
+    - apiGroups:
+        - ''
+      resources:
+        - secrets
+      verbs:
+        - create
+        - list
+        - delete
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30  # days
